@@ -76,3 +76,71 @@ class AWSOracleConnection:
 database_config = {
     'aws_access_key_id': 'your_access_key',
     'aws_secret_
+
+    
+    
+    
+    
+import boto3
+import pandas as pd
+
+class OracleAWS:
+    def __init__(self, config):
+        self.exec_type = config.get('ExecType')
+        self.query = config.get('Query')
+        self.return_type = config.get('returnType')
+    
+    def execute_query(self):
+        # Connect to AWS Oracle instance using boto3
+        # Code to execute query
+        # Store the result of query execution
+        
+        result = None # Replace with result of query execution
+        return result
+    
+    def write_to_file(self, result):
+        filename = self.return_type['Details']['Filename']
+        delimiter = self.return_type['Details']['Delimiter']
+        
+        # Convert result to pandas dataframe
+        df = pd.DataFrame(result)
+        
+        # Write dataframe to file with specified filename and delimiter
+        df.to_csv(filename, sep=delimiter, index=False)
+    
+    def return_dataframe(self, result):
+        delimiter = self.return_type['Details']['Delimiter']
+        
+        # Convert result to pandas dataframe
+        df = pd.DataFrame(result)
+        return df
+    
+    def return_records(self, result):
+        delimiter = self.return_type['Details']['Delimiter']
+        
+        # Convert result to list of records
+        records = result.split(delimiter)
+        return records
+    
+    def send_email(self, result):
+        # Connect to email server
+        # Code to send email with the result
+        from_ = self.return_type['Details']['from']
+        to = self.return_type['Details']['to']
+        subject = self.return_type['Details']['subject']
+        body = self.return_type['Details']['body']
+        emailout = self.return_type['Details']['emailout']
+        source = self.return_type['Details']['source']
+        
+        pass # Replace with code to send email
+    
+    def run(self):
+        result = self.execute_query()
+        if self.return_type['Type'] == 'file':
+            self.write_to_file(result)
+        elif self.return_type['Type'] == 'dataframe':
+            df = self.return_dataframe(result)
+        elif self.return_type['Type'] == 'records':
+            records = self.return_records(result)
+        elif self.return_type['Type'] == 'Email':
+            self.send_email(result)
