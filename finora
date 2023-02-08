@@ -1,3 +1,55 @@
+    # Create a string for the input parameters in the format :input1, :input2, ...
+    def execute_stored_proc(proc_name, input_params, output_params=None):
+try:
+# Connect to Oracle database
+connection = cx_Oracle.connect("user", "password", "host:port/sid")
+cursor = connection.cursor()
+    input_string = ", ".join([f":{i}" for i in range(1, len(input_params) + 1)])
+    
+    # Create a string for the output parameters in the format :out1, :out2, ...
+    output_string = ", ".join([f":{i}" for i in range(len(input_params) + 1, len(input_params) + len(output_params) + 1)]) if output_params else ""
+    
+    # Execute the stored procedure
+    cursor.callproc(proc_name, [input_params + output_params] if output_params else [input_params])
+    
+    # Fetch the output parameters (if any)
+    output = cursor.fetchall() if output_params else []
+    
+    # Commit the transaction
+    connection.commit()
+    
+    # Close the cursor and connection
+    cursor.close()
+    connection.close()
+    
+    return output
+except cx_Oracle.DatabaseError as e:
+    print(f"An error occurred while executing the stored procedure: {e}")
+    # Rollback the transaction
+    connection.rollback()
+    # Close the cursor and connection
+    cursor.close()
+    connection.close()
+    
+    
+    Example usage
+
+For scenario 1:
+
+proc_name = "example_proc"
+input_params = [1, 2, 3]
+
+execute_stored_proc(proc_name, input_params)
+
+For scenario 2:
+
+output_params = ["out1", "out2", "out3"]
+
+result = execute_stored_proc(proc_name, input_params, output_params)
+print(result)
+
+
+
 import cx_Oracle
 import json
 
