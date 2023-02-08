@@ -1,0 +1,201 @@
+import cx_Oracle
+import pandas as pd
+
+class Oracle:
+    def __init__(self, conn_string):
+        self.conn = cx_Oracle.connect(conn_string)
+
+    def select(self, sql, bind_params=None):
+        cursor = self.conn.cursor()
+        try:
+            if bind_params:
+                cursor.execute(sql, bind_params)
+            else:
+                cursor.execute(sql)
+            result = cursor.fetchall()
+            columns = [i[0] for i in cursor.description]
+            df = pd.DataFrame(result, columns=columns)
+            for column in columns:
+                if df[column].dtype in (cx_Oracle.LONG, cx_Oracle.RAW, cx_Oracle.BLOB, cx_Oracle.CLOB):
+                    df[column] = df[column].apply(lambda x: x.read().decode())
+            return df
+        except cx_Oracle.Error as e:
+            print("Error while executing select query: ", e)
+        finally:
+            cursor.close()
+
+    def insert(self, sql, bind_params=None):
+        cursor = self.conn.cursor()
+        try:
+            if bind_params:
+                cursor.execute(sql, bind_params)
+            else:
+                cursor.execute(sql)
+            self.conn.commit()
+        except cx_Oracle.Error as e:
+            print("Error while executing insert query: ", e)
+            self.conn.rollback()
+        finally:
+            cursor.close()
+
+    def delete(self, sql, bind_params=None):
+        cursor = self.conn.cursor()
+        try:
+            if bind_params:
+                cursor.execute(sql, bind_params)
+            else:
+                cursor.execute(sql)
+            self.conn.commit()
+        except cx_Oracle.Error as e:
+            print("Error while executing delete query: ", e)
+            self.conn.rollback()
+        finally:
+            cursor.close()
+
+    def update(self, sql, bind_params=None):
+        cursor = self.conn.cursor()
+        try:
+            if bind_params:
+                cursor.execute(sql, bind_params)
+            else:
+                cursor.execute(sql)
+            self.conn.commit()
+        except cx_Oracle.Error as e:
+            print("Error while executing update query: ", e)
+            self.conn.rollback()
+        finally:
+            cursor.close()
+
+    def procedure(self, proc_name, in_params=None, out_params=None):
+      cursor = self.conn.cursor()
+      try:
+          if in_params and out_params:
+              cursor.callproc(proc_name, in_params, out_params)
+          elif in_params:
+              cursor.callproc(proc_name, in_params)
+          else:
+              cursor.callproc(proc_name)
+          result = cursor.fetchall()
+          columns = [i[0] for i in cursor.description]
+          df = pd.DataFrame(result, columns=columns)
+          return df
+      except cx_Oracle.Error as e:
+          print("Error while executing procedure: ", e)
+      finally:
+          cursor.close()
+
+'''
+# Establish a connection to the Oracle database
+conn_string = "user/password@host:port/sid"
+oracle = Oracle(conn_string)
+
+# Execute a select statement without bind parameters
+sql = "SELECT * FROM table_name"
+df = oracle.select(sql)
+print(df)
+
+# Execute a select statement with bind parameters
+sql = "SELECT * FROM table_name WHERE column_name = :column_value"
+bind_params = {'column_value': 'some_value'}
+df = oracle.select(sql, bind_params)
+print(df)
+'''
+
+
+
+
+import json
+import pandas as pd
+from oracle import Oracle
+
+class DataExecutor:
+    def __init__(self, conn_string):
+        self.conn_string = conn_string
+
+    def execute(self, input_json):
+        input_dict = json.loads(input_json)
+        execution_type = input_dict['Execution_Type']
+        sql_dict = input_dict['sql']
+        return_dict = input_dict['ReturnType']
+
+        oracle = Oracle(self.conn_string)
+        
+        if execution_type == 'Select':
+            query = sql_dict['Query']
+            if 'bindparams' in sql_dict:
+                bind_params = {k: v for k, v in zip(sql_dict['bindparams'].split(','), range(len(sql_dict['bindparams'].split(','))))}
+                df = oracle.select(query, bind_params)
+            else:
+                df = oracle.select(query)
+
+            if return_dict['Type'] == 'file':
+                filename = return_dict['filename']
+                delimiter = return_dict['delimiter']
+                df.to_csv(filename, sep=delimiter, index=False)
+                return 'Data written to file successfully'
+            elif return_dict['Type'] == 'records':
+                delimiter = return_dict['delimiter']
+                return df.to_dict(orient='records')
+            elif return_dict['Type'] == 'dataframes':
+                return df
+            else:
+                return 'Invalid return type'
+        
+        elif execution_type == 'Insert':
+            query = sql_dict['Query']
+            if 'bindparams' in sql_dict:
+                bind_params = {k: v for k, v in zip(sql_dict['bindparams'].split(','), range(len(sql_dict['bindparams'].split(','))))}
+                oracle.insert(query, bind_params)
+            else:
+                oracle.insert(query)
+            return 'Insert successful'
+        
+        elif execution_type == 'Update':
+            query = sql_dict['Query']
+            if 'bindparams' in sql_dict:
+                bind_params = {k: v for k, v in zip(sql_dict['bindparams'].split(','), range(len(sql_dict['bindparams'].split(','))))}
+                oracle.update(query, bind_params)
+            else:
+                oracle.update(query)
+            return 'Update successful'
+        
+        elif execution_type == 'Delete':
+            query = sql_dict['Query']
+            if 'bindparams' in sql_dict:
+                bind_params = {k: v for k, v in zip(sql_dict['bindparams'].split(','), range(len(sql_dict['bindparams'].split(','))))}
+                oracle.delete(query, bind_params)
+            else:
+                oracle.delete(query)
+            return 'Delete successful'
+        
+        elif execution_type == 'Procedure
+ 
+ 
+ 
+ '''
+ # Import the Oracle class and DataExecutor class
+from Oracle import Oracle
+from DataExecutor import DataExecutor
+
+# Create an instance of the Oracle class with your connection parameters
+oracle = Oracle(user='<username>', password='<password>', host='<hostname>', port='<port>', service_name='<service_name>')
+
+# Create an instance of the DataExecutor class with the Oracle class as an argument
+executor = DataExecutor(oracle)
+
+# Define the JSON input
+json_input = {
+  "Execution_Type" : "Select",
+  "sql": {
+    "Query":"select * from dual",
+    "bindparams":"param1,param2"
+  },
+  "ReturnType": {
+    "Type":"dataframes",
+    "delimiter":","
+  }
+}
+
+# Call the `run` method on the DataExecutor instance and pass the JSON input
+executor.run(json_input)
+''''
