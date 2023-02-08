@@ -1,5 +1,47 @@
 import cx_Oracle
 
+def execute_stored_proc(procname, input_params=None, output_params=None):
+    # Connect to the Oracle database
+    conn = cx_Oracle.connect("user/password@oracle_sid")
+    cursor = conn.cursor()
+
+    # Prepare the input parameters for the stored procedure
+    if input_params:
+        input_params = ",".join(str(x) for x in input_params)
+    else:
+        input_params = ""
+
+    # Prepare the output parameters for the stored procedure
+    if output_params:
+        output_params = ",".join(":" + x for x in output_params)
+    else:
+        output_params = ""
+
+    # Execute the stored procedure
+    cursor.callproc(procname, [input_params, output_params])
+
+    # Fetch the output parameters if they were specified
+    if output_params:
+        results = cursor.fetchall()
+        return results
+
+# Example usage:
+# Scenario 1: Execute stored procedure with input parameters
+input_params = [1, 2, 3]
+execute_stored_proc("procname", input_params)
+
+# Scenario 2: Execute stored procedure with input and output parameters
+input_params = [1, 2, 3]
+output_params = ["out1", "out2"]
+results = execute_stored_proc("procname", input_params, output_params)
+
+# Scenario 3: Execute stored procedure 
+
+
+
+
+import cx_Oracle
+
 class Oracle:
     def __init__(self, connection_string):
         self.conn = cx_Oracle.connect(connection_string)
