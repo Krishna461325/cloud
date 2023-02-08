@@ -1,4 +1,55 @@
 import cx_Oracle
+import json
+
+def execute_stored_procedure(input_data):
+    # Connect to the Oracle database
+    connection = cx_Oracle.connect("username/password@database")
+    cursor = connection.cursor()
+    
+    # Parse the input data
+    execution_type = input_data['ExecutionType']
+    procedure_name = input_data['ProcedureName']
+    input_params = input_data['InputParams']
+    output_params = input_data['OutputParams']
+    
+    # Check if the execution type is a procedure
+    if execution_type.lower() != 'procedure':
+        return {"error": "Execution type must be 'Procedure'"}
+    
+    # Create a list of input parameters
+    input_list = [input_params[key] for key in input_params]
+    
+    # Execute the stored procedure
+    cursor.callproc(procedure_name, input_list)
+    
+    # Fetch the output parameters
+    output_values = cursor.fetchall()[0]
+    
+    # Create a dictionary to store the output parameters
+    output_dict = {}
+    for i, output_param in enumerate(output_params):
+        output_dict[output_param] = output_values[i]
+    
+    # Close the cursor and connection
+    cursor.close()
+    connection.close()
+    
+    # Return the output parameters
+    return output_dict
+
+# Test the function with sample input data
+input_data = {
+    "ExecutionType": "Procedure",
+    "ProcedureName": "Procname",
+    "InputParams": {"inputparam1": "value1", "inputparam2": "value2"},
+    "OutputParams": {"outputparam1": "value1" <datatype>, "outputparam2": "value2" <datatype>}
+}
+output = execute_stored_procedure(input_data)
+print(json.dumps(output, indent=4))
+
+
+
+import cx_Oracle
 import pandas as pd
 
 class Oracle:
