@@ -1,3 +1,14 @@
+def search_key_in_dict(my_dict, search_key):
+    for key, value in my_dict.items():
+        if key.lower() == search_key.lower():
+            return value
+        elif isinstance(value, dict):
+            result = search_key_in_dict(value, search_key)
+            if result is not None:
+                return result
+    return None
+
+
 import json
 import boto3
 
