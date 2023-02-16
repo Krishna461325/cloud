@@ -1,0 +1,64 @@
+import argparse
+import json
+import logging
+import os
+import threading
+from datetime import datetime
+from seven_zip import SevenZip
+
+def archive_folder(folder_path, archive_dir, archive_individual, archive_name, age):
+    try:
+        # Create an instance of the SevenZip class
+        sevenzip = SevenZip()
+        sevenzip.archive_folder(folder_path, archive_dir, archive_individual, archive_name, age)
+    except Exception as e:
+        # If an exception occurs during archival, log an error message with details about the failed folder
+        logging.error(f"Error archiving folder {folder_path}: {str(e)}")
+        raise e
+
+def archive_folder_thread(folder):
+    try:
+        folder_path = folder['folder_path']
+        age = folder.get('age', None)
+        pattern = folder.get('pattern', None)
+        archive_individual = folder.get('archive_individual', False)
+        archive_name = folder.get('archive_name', None)
+        archive_dir = folder.get('archive_dir', 'archives/')
+
+        # Call the archive_folder function with the specified arguments
+        archive_folder(folder_path, archive_dir, archive_individual, archive_name, age)
+    except Exception as e:
+        # If an exception occurs during archival, log an error message with details about the failed thread
+        logging.error(f"Error archiving folder in thread {threading.current_thread().name}: {str(e)}")
+
+def main(source):
+    # Read the JSON file containing the folders to archive
+    with open(source, 'r') as f:
+        folders_to_archive = json.load(f)
+
+    # Create a thread for each folder to archive
+    threads = []
+    for folder in folders_to_archive:
+        t = threading.Thread(target=archive_folder_thread, args=(folder,))
+        threads.append(t)
+
+    # Start the threads in parallel
+    for t in threads:
+        t.start()
+
+    # Wait for all threads to complete
+    for t in threads:
+        t.join()
+
+if __name__ == '__main__':
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Archive folders specified in a JSON file')
+    parser.add_argument('source', help='Name of the JSON file containing the folders to archive')
+    args = parser.parse_args()
+
+    # Initialize logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+
+    # Call the main function with the specified source file
+    main(args.source)
+
