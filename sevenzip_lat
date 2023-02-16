@@ -1,0 +1,130 @@
+import os
+import platform
+import py7zr
+import glob
+from datetime import datetime
+
+class SevenZipper:
+    def __init__(self):
+        self.archive_dir = os.path.join(os.getcwd(), 'archive')
+        self.archive_individual = False
+        self.extract_dir = ''
+
+    def archive_files(self, files_to_archive, archive_dir='', archive_individual=False):
+        # Set the archive directory if provided
+        if archive_dir:
+            self.archive_dir = archive_dir
+        if not os.path.exists(self.archive_dir):
+            os.makedirs(self.archive_dir)
+
+        # Set the archive individual flag if provided
+        self.archive_individual = archive_individual
+
+        # Get the current timestamp for use in the archive filename
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+        # Create the archive filename based on the current timestamp
+        archive_filename = f'archive_{timestamp}.7z'
+
+        # Archive individual files
+        if self.archive_individual:
+            for file_path in files_to_archive:
+                try:
+                    with py7zr.SevenZipFile(os.path.join(self.archive_dir, f'{os.path.splitext(os.path.basename(file_path))[0]}_{timestamp}.7z'), 'w') as archive:
+                        archive.write(file_path, os.path.basename(file_path))
+                except Exception as e:
+                    print(f"Error archiving {file_path}: {e}")
+        else:
+            # Archive all files to a single archive file
+            try:
+                with py7zr.SevenZipFile(os.path.join(self.archive_dir, archive_filename), 'w') as archive:
+                    for file_path in files_to_archive:
+                        archive.write(file_path, os.path.basename(file_path))
+            except Exception as e:
+                print(f"Error archiving files: {e}")
+    def archive_folder(self, folder_path, file_pattern, archive_dir='', archive_individual=False, age=None):
+        # Set the archive directory if provided
+        if archive_dir:
+            self.archive_dir = archive_dir
+        if not os.path.exists(self.archive_dir):
+            os.makedirs(self.archive_dir)
+
+        # Set the archive individual flag if provided
+        self.archive_individual = archive_individual
+
+        # Get the current timestamp for use in the archive filenames
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+        # Create the archive filename based on the current timestamp
+        archive_filename = f'archive_{timestamp}.7z'
+
+        # Archive individual files
+        if self.archive_individual:
+            for file_path in glob.glob(os.path.join(folder_path, file_pattern)):
+                if age:
+                    file_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(file_path))
+                    if file_age.days <= age:
+                        try:
+                            with py7zr.SevenZipFile(os.path.join(self.archive_dir, f'{os.path.splitext(os.path.basename(file_path))[0]}_{timestamp}.7z'), 'w') as archive:
+                                archive.write(file_path, os.path.basename(file_path))
+                        except Exception as e:
+                            print(f"Error archiving {file_path}: {e}")
+                else:
+                    try:
+                        with py7zr.SevenZipFile(os.path.join(self.archive_dir, f'{os.path.splitext(os.path.basename(file_path))[0]}_{timestamp}.7z'), 'w') as archive:
+                            archive.write(file_path, os.path.basename(file_path))
+                    except Exception as e:
+                        print(f"Error archiving {file_path}: {e}")
+        else:
+            # Archive all files to a single archive file
+            file_list = glob.glob(os.path.join(folder_path, file_pattern))
+            if age:
+                file_list = [f for f in file_list if (datetime.now() - datetime.fromtimestamp(os.path.getmtime(f))).days <= age]
+            if file_list:
+                try:
+                    with py7zr.SevenZipFile(os.path.join(self.archive_dir, archive_filename), 'w') as archive:
+                        for file_path in file_list:
+                            archive.write(file_path, os.path.basename(file_path))
+                except Exception as e:
+                    print(f"Error archiving files: {e}")
+            else:
+                print(f"No files found to archive with pattern '{file_pattern}' in folder '{folder_path}'")
+    def extract_archive(self, archive_path, extract_dir=''):
+        # Set the extract directory if provided, or to the default directory if none is provided
+        if extract_dir:
+            self.extract_dir = extract_dir
+        elif platform.system() == 'Windows':
+            self.extract_dir = 'C:/temp/'
+        else:
+            self.extract_dir = '/tmp/'
+
+        # Create the extract directory if it does not exist
+        if not os.path.exists(self.extract_dir):
+            os.makedirs(self.extract_dir)
+
+        # Extract the archive
+        try:
+            with py7zr.SevenZipFile(archive_path, mode='r') as archive:
+                archive.extractall(path=self.extract_dir)
+        except FileNotFoundError:
+            print(f"Error extracting '{archive_path}': file not found")
+        except py7zr.exceptions.Bad7zFile:
+            print(f"Error extracting '{archive_path}': invalid 7zip file")
+        except Exception as e:
+            print(f"Error extracting '{archive_path}': {e}")
+
+
+## how to use
+from sevenzip import SevenZip
+sevenzip = SevenZip()
+file_list = ['file1.txt', 'file2.txt', 'file3.txt']
+sevenzip.archive_files(file_list, archive_dir='archives/', archive_individual=True)
+folder_path = '/path/to/folder'
+archive_name = 'folder_archive'
+age = 7
+sevenzip.archive_folder(folder_path, archive_dir='archives/', archive_individual=False, archive_name=archive_name, age=age)
+archive_path = '/path/to/archive.7z'
+extract_dir = '/path/to/extract/dir'
+sevenzip.extract_archive(archive_path, extract_dir=extract_dir)
+
+    
