@@ -1,0 +1,58 @@
+import os
+import glob
+import py7zr
+
+class SevenZip:
+    def archive(self, source, destination=None, files=None, pattern=None):
+        if files is not None:
+            for file in files:
+                self.archive_file(file, destination)
+        elif os.path.isfile(source):
+            self.archive_file(source, destination)
+        elif os.path.isdir(source):
+            self.archive_directory(source, destination, pattern)
+        else:
+            raise ValueError('Invalid source specified')
+
+    def archive_file(self, file_path, destination=None):
+        if destination is None:
+            source_dir = os.path.dirname(file_path)
+            archive_filename = os.path.basename(file_path) + '.7zip'
+            archive_path = os.path.join(source_dir, archive_filename)
+        else:
+            archive_path = destination
+
+        with py7zr.SevenZipFile(archive_path, 'w') as archive:
+            archive.write(file_path, os.path.basename(file_path))
+
+    def archive_directory(self, source_dir, destination=None, pattern='*'):
+        if destination is None:
+            archive_filename = os.path.basename(source_dir) + '.7zip'
+            archive_path = os.path.join(source_dir, archive_filename)
+        else:
+            archive_path = destination
+
+        with py7zr.SevenZipFile(archive_path, 'w') as archive:
+            for file_path in glob.glob(os.path.join(source_dir, pattern)):
+                archive.write(file_path, os.path.basename(file_path))
+
+    def extract(self, source, target_path):
+        with py7zr.SevenZipFile(source, 'r') as archive:
+            archive.extractall(path=target_path)
+
+
+
+# create an instance of the SevenZip class
+zipper = SevenZip()
+
+# archive a single file
+zipper.archive('C:/path/to/file.txt')
+
+# archive multiple files
+zipper.archive(files=['C:/path/to/file1.txt', 'C:/path/to/file2.txt'])
+
+# archive a directory
+zipper.archive('C:/path/to/directory', pattern='*.txt')
+
+# extract an archive
+zipper.extract('C:/path/to/archive.7zip', 'C:/path/to/extract/to')
