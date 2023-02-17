@@ -1,0 +1,66 @@
+import os
+import datetime
+import re
+import glob
+import concurrent.futures
+
+class FileGetter:
+    def __init__(self):
+        self.path = None
+        self.age = None
+        self.patterns = None
+        self.recursive = None
+        self.min_depth = None
+        self.max_depth = None
+        self.num_workers = None
+
+    def _filter_file(self, file_path):
+        if not os.path.isfile(file_path):
+            return False
+        creation_time = os.path.getctime(file_path)
+        age_days = (datetime.datetime.now() - datetime.datetime.fromtimestamp(creation_time)).days
+        if age_days > self.age:
+            for pattern in self.patterns:
+                if re.match(glob.glob(pattern), os.path.basename(file_path)):
+                    return True
+        return False
+
+    
+    def get_files(self, path=None, age=None, patterns=None, recursive=None, min_depth=None, max_depth=None, num_workers=None):
+        if path is not None:
+            self.path = path
+        if age is not None:
+            self.age = age
+        if patterns is not None:
+            self.patterns = patterns
+        if recursive is not None:
+            self.recursive = recursive
+        if min_depth is not None:
+            self.min_depth = min_depth
+        if max_depth is not None:
+            self.max_depth = max_depth
+        if num_workers is not None:
+            self.num_workers = num_workers
+
+        matching_files = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            for entry in os.scandir(self.path):
+                if entry.is_dir() and self.recursive:
+                    if self.max_depth is None or entry.path[len(self.path) + 1:].count(os.path.sep) <= self.max_depth:
+                        executor.submit(self._search_dir, entry.path, matching_files)
+                elif entry.is_file() and self._filter_file(entry.path):
+                    matching_files.append(entry.path)
+        return matching_files
+
+    def _search_dir(self, path, matching_files):
+        for entry in os.scandir(path):
+            if entry.is_dir():
+                if self.max_depth is None or entry.path[len(self.path) + 1:].count(os.path.sep) <= self.max_depth:
+                    self._search_dir(entry.path, matching_files)
+            elif entry.is_file() and self._filter_file(entry.path):
+                matching_files.append(entry.path)
+
+## how to use
+file_getter = FileGetter()
+matching_files = file_getter.get_files(path='/path/to/directory', age=30, patterns=['*.txt', '*.csv'], recursive=True, min_depth=1, max_depth=2, num_workers=4)
+
