@@ -1,8 +1,8 @@
 import os
-import datetime
 import re
-import glob
+import time
 import concurrent.futures
+
 
 class FileGetter:
     def __init__(self):
@@ -14,19 +14,7 @@ class FileGetter:
         self.max_depth = None
         self.num_workers = None
 
-    def _filter_file(self, file_path):
-        if not os.path.isfile(file_path):
-            return False
-        creation_time = os.path.getctime(file_path)
-        age_days = (datetime.datetime.now() - datetime.datetime.fromtimestamp(creation_time)).days
-        if age_days > self.age:
-            for pattern in self.patterns:
-                if re.match(glob.glob(pattern), os.path.basename(file_path)):
-                    return True
-        return False
-
-    
-    def get_files(self, path=None, age=None, patterns=None, recursive=None, min_depth=None, max_depth=None, num_workers=None):
+    def get_files(self, path=None, age=None, patterns=None, recursive=False, min_depth=None, max_depth=None, num_workers=None):
         if path is not None:
             self.path = path
         if age is not None:
@@ -42,25 +30,48 @@ class FileGetter:
         if num_workers is not None:
             self.num_workers = num_workers
 
+        if self.path is None:
+            raise ValueError("path is not set")
+        if self.age is None:
+            raise ValueError("age is not set")
+        if self.patterns is None:
+            raise ValueError("patterns is not set")
+        if not self.recursive and (self.min_depth is None or self.max_depth is None):
+            self.min_depth = 1
+            self.max_depth = 1
+
+        if self.num_workers is None:
+            return self._search_files(self.path)
+        else:
+            return self._search_files_threaded(self.path)
+
+    def _search_files(self, path):
         matching_files = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-            for entry in os.scandir(self.path):
-                if entry.is_dir() and self.recursive:
-                    if self.max_depth is None or entry.path[len(self.path) + 1:].count(os.path.sep) <= self.max_depth:
-                        executor.submit(self._search_dir, entry.path, matching_files)
-                elif entry.is_file() and self._filter_file(entry.path):
-                    matching_files.append(entry.path)
+        for entry in os.scandir(path):
+            if entry.is_file(follow_symlinks=False):
+                if any(re.match(pattern, entry.name) for pattern in self.patterns):
+                    file_age = time.time() - entry.stat(follow_symlinks=False).st_mtime
+                    if file_age > self.age * 24 * 3600:
+                        matching_files.append(entry.path)
+            elif self.recursive and entry.is_dir(follow_symlinks=False):
+                if self.min_depth is not None and self.max_depth is not None:
+                    depth = entry.path[len(path.rstrip(os.path.sep))+1:].count(os.path.sep) + 1
+                    if depth < self.min_depth or depth > self.max_depth:
+                        continue
+                matching_files += self._search_files(entry.path)
         return matching_files
 
-    def _search_dir(self, path, matching_files):
-        for entry in os.scandir(path):
-            if entry.is_dir():
-                if self.max_depth is None or entry.path[len(self.path) + 1:].count(os.path.sep) <= self.max_depth:
-                    self._search_dir(entry.path, matching_files)
-            elif entry.is_file() and self._filter_file(entry.path):
-                matching_files.append(entry.path)
+    def _search_files_threaded(self, path):
+        matching_files = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            future_to_path = {executor.submit(self._search_files, entry.path): entry for entry in os.scandir(path) if entry.is_dir(follow_symlinks=False)}
+            for future in concurrent.futures.as_completed(future_to_path):
+                matching_files += future.result()
+        matching_files += self._search_files(path)
+        return matching_files
 
-## how to use
+
+#how to use
+
 file_getter = FileGetter()
-matching_files = file_getter.get_files(path='/path/to/directory', age=30, patterns=['*.txt', '*.csv'], recursive=True, min_depth=1, max_depth=2, num_workers=4)
-
+matching_files = file_getter.get_files(path='/path/to/directory', age=30, patterns=['.*\.txt', '.*\.csv'], recursive=True, min_depth=1, max_depth=2, num_workers=4)
