@@ -1,0 +1,79 @@
+import os
+import fnmatch
+import datetime
+import concurrent.futures
+
+
+class FileLister:
+    def list_files(self, path, patterns, age=None, recursive=False, depth=None, min_depth=None, max_depth=None, sorted=False, num_workers=1):
+        files = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+            tasks = []
+            for root, dirs, filenames in os.walk(path):
+                if not recursive and root != path:
+                    break
+                if min_depth is not None and len(os.path.relpath(root, path).split(os.sep)) < min_depth:
+                    continue
+                if max_depth is not None and len(os.path.relpath(root, path).split(os.sep)) > max_depth:
+                    continue
+                for pattern in patterns:
+                    tasks.append(executor.submit(self._list_files_in_dir, root, pattern, age))
+
+            for future in concurrent.futures.as_completed(tasks):
+                files.extend(future.result())
+
+        if sorted:
+            files.sort(key=os.path.getctime)
+
+        return files
+
+    def list_files_by_date(self, path, date, created=True, num_workers=1):
+        files = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+            tasks = []
+            for root, dirs, filenames in os.walk(path):
+                for filename in filenames:
+                    filepath = os.path.join(root, filename)
+                    tasks.append(executor.submit(self._list_files_by_date_in_file, filepath, date, created))
+
+            for future in concurrent.futures.as_completed(tasks):
+                result = future.result()
+                if result is not None:
+                    files.append(result)
+
+        return files
+
+    def _list_files_in_dir(self, root, pattern, age):
+        files = []
+        for filename in fnmatch.filter(os.listdir(root), pattern):
+            filepath = os.path.join(root, filename)
+            if age is None or self._is_file_within_age(filepath, age):
+                files.append(filepath)
+        return files
+
+    def _list_files_by_date_in_file(self, filepath, date, created):
+        filetime = os.path.getctime(filepath) if created else os.path.getmtime(filepath)
+        filedate = datetime.date.fromtimestamp(filetime)
+        if filedate.strftime("%Y%m%d") == date:
+            return filepath
+        return None
+
+    def _is_file_within_age(self, filepath, age):
+        age_seconds = age * 24 * 60 * 60
+        file_time = os.path.getctime(filepath)
+        now = datetime.datetime.now().timestamp()
+        return now - file_time < age_seconds
+
+
+"""
+lister = FileLister()
+path = '/path/to/folder'
+patterns = ['*.txt', '*.pdf']
+age = 30  # files modified/created within the last 30 days
+recursive = True
+depth = 3  # limit recursion depth to 3 levels
+sorted = True  # sort files by created time
+num_workers = 4  # use 4 worker threads for file processing
+
+files = lister.list_files(path=path, patterns=patterns, age=age, recursive=recursive, depth
+"""
