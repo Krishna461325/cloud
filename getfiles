@@ -1,77 +1,105 @@
 import os
 import re
 import time
-import concurrent.futures
+import threading
 
+class FileLister:
+    def __init__(self, path, patterns=['.*'], age=None, recursive=False, depth=None, min_depth=None, max_depth=None, sorted_by=None, use_threads=False):
+        self.path = path
+        self.patterns = patterns
+        self.age = age
+        self.recursive = recursive
+        self.depth = depth if depth is not None else 1
+        self.min_depth = min_depth if min_depth is not None else 1
+        self.max_depth = max_depth if max_depth is not None else float('inf')
+        self.sorted_by = sorted_by
+        self.use_threads = use_threads
 
-class FileGetter:
-    def __init__(self):
-        self.path = None
-        self.age = None
-        self.patterns = None
-        self.recursive = None
-        self.min_depth = None
-        self.max_depth = None
-        self.num_workers = None
+    def _match_patterns(self, filename):
+        for pattern in self.patterns:
+            if re.match(pattern, filename):
+                return True
+        return False
 
-    def get_files(self, path=None, age=None, patterns=None, recursive=False, min_depth=None, max_depth=None, num_workers=None):
-        if path is not None:
-            self.path = path
-        if age is not None:
-            self.age = age
-        if patterns is not None:
-            self.patterns = patterns
-        if recursive is not None:
-            self.recursive = recursive
-        if min_depth is not None:
-            self.min_depth = min_depth
-        if max_depth is not None:
-            self.max_depth = max_depth
-        if num_workers is not None:
-            self.num_workers = num_workers
-
-        if self.path is None:
-            raise ValueError("path is not set")
+    def _check_age(self, filename):
         if self.age is None:
-            raise ValueError("age is not set")
-        if self.patterns is None:
-            raise ValueError("patterns is not set")
-        if not self.recursive and (self.min_depth is None or self.max_depth is None):
-            self.min_depth = 1
-            self.max_depth = 1
-
-        if self.num_workers is None:
-            return self._search_files(self.path)
+            return True
         else:
-            return self._search_files_threaded(self.path)
+            age_seconds = time.time() - os.path.getctime(filename)
+            age_days = age_seconds / (60 * 60 * 24)
+            return age_days <= self.age
 
-    def _search_files(self, path):
-        matching_files = []
-        for entry in os.scandir(path):
-            if entry.is_file(follow_symlinks=False):
-                if any(re.match(pattern, entry.name) for pattern in self.patterns):
-                    file_age = time.time() - entry.stat(follow_symlinks=False).st_mtime
-                    if file_age > self.age * 24 * 3600:
-                        matching_files.append(entry.path)
-            elif self.recursive and entry.is_dir(follow_symlinks=False):
-                if self.min_depth is not None and self.max_depth is not None:
-                    depth = entry.path[len(path.rstrip(os.path.sep))+1:].count(os.path.sep) + 1
-                    if depth < self.min_depth or depth > self.max_depth:
-                        continue
-                matching_files += self._search_files(entry.path)
-        return matching_files
+    def _list_files_helper(self, directory, depth):
+        if self.recursive and depth > self.max_depth:
+            return []
+        if not self.recursive and depth > 1:
+            return []
+        files = []
+        for filename in os.listdir(directory):
+            filepath = os.path.join(directory, filename)
+            if os.path.isdir(filepath):
+                if self.recursive and depth < self.max_depth:
+                    files.extend(self._list_files_helper(filepath, depth+1))
+            elif self._match_patterns(filename) and self._check_age(filepath):
+                files.append(filepath)
+        return files
 
-    def _search_files_threaded(self, path):
-        matching_files = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-            future_to_path = {executor.submit(self._search_files, entry.path): entry for entry in os.scandir(path) if entry.is_dir(follow_symlinks=False)}
-            for future in concurrent.futures.as_completed(future_to_path):
-                matching_files += future.result()
-        matching_files += self._search_files(path)
-        return matching_files
+    def list_files(self):
+        if self.use_threads:
+            result = []
+            lock = threading.Lock()
+            threads = []
+            for depth in range(self.min_depth, self.depth+1):
+                t = threading.Thread(target=self._list_files_helper, args=(self.path, depth), kwargs={}, daemon=True)
+                threads.append(t)
+                t.start()
+
+            for t in threads:
+                t.join()
+                files = t.result
+                with lock:
+                    result.extend(files)
+        else:
+            result = self._list_files_helper(self.path, 1)
+
+        if self.sorted_by is not None:
+            result.sort(key=lambda x: os.path.getmtime(x) if self.sorted_by == 'modified' else os.path.getctime(x))
+        return result
 
 
-#how to use
+## How to 
+# List all files in a directory
+lister = FileLister(path='/path/to/directory')
+files = lister.list_files()
 
-file_getter = FileGetter()
-matching_files = file_getter.get_files(path='/path/to/directory', age=30, patterns=['.*\.txt', '.*\.csv'], recursive=True, min_depth=1, max_depth=2, num_workers=4)
+# List all files with patterns 'txt' or 'pdf' in a directory and its subdirectories, created within the last 7 days
+lister = FileLister(path='/path/to/directory', patterns=['.*txt', '.*pdf'], age=7, recursive=True)
+files = lister.list_files()
+
+# List all files in a directory and its subdirectories, with a maximum depth of 3
+lister = FileLister(path='/path/to/directory', recursive=True, max_depth=3)
+files = lister.list_files()
+
+# List all files in a directory and its subdirectories, sorted by modification time
+lister = FileLister(path='/path/to/directory', recursive=True, sorted_by='modified')
+files = lister.list_files()
+
+# List all files in a directory and its subdirectories using threads with a maximum depth of 3
+lister = FileLister(path='/path/to/directory', recursive=True, max_depth=3, use_threads=True)
+files = lister.list_files()
+
+# List all files in a directory and its subdirectories, using threads with a maximum depth of 3, and sorting by modification time
+lister = FileLister(path='/path/to/directory', recursive=True, max_depth=3, sorted_by='modified', use_threads=True)
+files = lister.list_files()
+
+# List all files in a directory and its subdirectories, with a minimum depth of 2 and a maximum depth of 4
+lister = FileLister(path='/path/to/directory', recursive=True, min_depth=2, max_depth=4)
+files = lister.list_files()
+
+# List all files in a directory and its subdirectories, with a maximum age of 30 days
+lister = FileLister(path='/path/to/directory', age=30)
+files = lister.list_files()
+
+# List all files in a directory and its subdirectories, with patterns including special characters
+lister = FileLister(path='/path/to/directory', patterns=['.*\.txt', '.*\?.pdf'])
+files = lister.list_files()
