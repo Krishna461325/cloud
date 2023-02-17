@@ -1,0 +1,107 @@
+import os
+import fnmatch
+from datetime import datetime, timedelta
+from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
+
+
+class FileLister:
+    def __init__(self, path, patterns=None, age=None, recursive=False, min_depth=1, max_depth=None, sorted_by=None):
+        self.path = path
+        self.patterns = patterns
+        self.age = age
+        self.recursive = recursive
+        self.min_depth = min_depth
+        self.max_depth = max_depth
+        self.sorted_by = sorted_by
+
+    def list_files(self, use_threads=True, num_workers=None):
+        files = []
+        for root, dirnames, filenames in os.walk(self.path):
+            depth = root[len(self.path) + len(os.path.sep):].count(os.path.sep)
+            if self.recursive and depth < self.min_depth:
+                dirnames[:] = []  # Don't recurse any deeper
+                continue
+            if self.recursive and self.max_depth is not None and depth > self.max_depth:
+                dirnames[:] = []  # Don't recurse any deeper
+                continue
+            for filename in filenames:
+                if self.patterns is None or any(fnmatch.fnmatch(filename, p) for p in self.patterns):
+                    full_path = os.path.join(root, filename)
+                    if self.age is None or self._is_recent(full_path, self.age):
+                        files.append(full_path)
+        if self.sorted_by is not None:
+            files = self._sort_files(files, self.sorted_by)
+        if use_threads:
+            files = self._list_files_with_threads(files, num_workers=num_workers)
+        return files
+
+    def _is_recent(self, path, age):
+        stat = os.stat(path)
+        file_time = datetime.fromtimestamp(stat.st_mtime)
+        cutoff_time = datetime.now() - timedelta(days=age)
+        return file_time > cutoff_time
+
+    def _sort_files(self, files, sorted_by):
+        if sorted_by == 'created':
+            return sorted(files, key=lambda f: os.stat(f).st_ctime)
+        elif sorted_by == 'modified':
+            return sorted(files, key=lambda f: os.stat(f).st_mtime)
+        else:
+            return files
+
+    def _list_files_with_threads(self, files, num_workers=None):
+        if num_workers is None:
+            num_workers = os.cpu_count()
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            result_files = []
+
+            def _list_files_in_thread(file_list):
+                for f in file_list:
+                    result_files.append(f)
+
+            chunk_size = max(1, len(files) // num_workers)
+            chunks = [files[i:i+chunk_size] for i in range(0, len(files), chunk_size)]
+            futures = [executor.submit(_list_files_in_thread, chunk) for chunk in chunks]
+            for future in futures:
+                future.result()
+
+            return result_files
+
+    def list_files_on_date(self, date_str, mode='modified'):
+        date_obj = datetime.strptime(date_str, '%Y%m%d')
+        files = []
+        for root, dirnames, filenames in os.walk(self.path):
+            for filename in filenames:
+                full_path = os.path.join(root, filename)
+                if os.name == 'nt':
+                    file_time = datetime.fromtimestamp(os.stat(full_path).st_mtime) if mode == 'modified' else datetime.fromtimestamp(os.stat(full_path).st_ctime)
+                else:
+                    # On Linux, use the newer `st_birthtime` attribute to get the file creation time
+                    file_time = datetime.fromtimestamp(os
+
+
+
+# List all files in a directory (non-recursive) with a pattern:
+lister = FileLister(path='/path/to/directory', patterns=['*.txt'])
+files = lister.list_files()
+#List all files in a directory (recursive) with a pattern and filter files last modified before a certain number of days:
+lister = FileLister(path='/path/to/directory', patterns=['*.txt'], age=7, recursive=True)
+files = lister.list_files()
+
+#List all files in a directory (recursive) with a pattern and filter files last modified before a certain number of days, and get files sorted based on modified time:
+lister = FileLister(path='/path/to/directory', patterns=['*.txt'], age=7, recursive=True, sorted_by='modified')
+files = lister.list_files()
+
+#List all files in a directory (recursive) with a pattern and filter files last modified before a certain number of days, and use 4 threads:
+lister = FileLister(path='/path/to/directory', patterns=['*.txt'], age=7, recursive=True)
+files = lister.list_files(use_threads=True, num_workers=4)
+
+#List all files in a directory (recursive) that have "20220101" anywhere in the filename, and filter by creation date (not modified date):
+lister = FileLister(path='/path/to/directory', patterns=['*20220101*'])
+files = lister.list_files()
+
+#List all files in a directory (recursive) that were created on a specific date (in yyyymmdd format), and get files sorted based on creation time:
+lister = FileLister(path='/path/to/directory', recursive=True, sorted_by='created')
+files = lister.list_files_on_date('20220101', mode='created')
