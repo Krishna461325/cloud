@@ -1,0 +1,74 @@
+import os
+import fnmatch
+import datetime
+
+
+class FileLister:
+    def list_files(self, path, patterns=None, age=None, recursive=False,
+                   depth=None, min_depth=1, max_depth=None, sorted=False):
+        if patterns is None:
+            patterns = ["*"]
+        if age is not None:
+            min_date = datetime.datetime.now() - datetime.timedelta(days=age)
+        if max_depth is None:
+            max_depth = depth if depth is not None else 1
+        if sorted:
+            sort_key = os.path.getmtime if age is None else os.path.getctime
+            sort_func = lambda x: sort_key(x[1])
+        else:
+            sort_func = None
+        return self._list_files_helper(path, patterns, min_date, recursive, depth,
+                                       min_depth, max_depth, sort_func)
+
+    def list_files_by_date(self, path, date_str, by_created=False):
+        date = datetime.datetime.strptime(date_str, "%Y%m%d")
+        return self._list_files_helper(path, "*", date, False, 1, 1, 1, None,
+                                       lambda x: os.path.getctime(x[1]) if by_created else os.path.getmtime(x[1]))
+
+    def _list_files_helper(self, path, patterns, min_date, recursive, depth, min_depth,
+                           max_depth, sort_func):
+        results = []
+        for root, dirnames, filenames in os.walk(path):
+            if not recursive:
+                depth = 1
+                dirnames[:] = []
+            if root == path:
+                cur_depth = 1
+            else:
+                cur_depth = root.count(os.path.sep) - path.count(os.path.sep) + 1
+            if cur_depth < min_depth or (max_depth is not None and cur_depth > max_depth):
+                continue
+            for pattern in patterns:
+                for filename in fnmatch.filter(filenames, pattern):
+                    full_path = os.path.join(root, filename)
+                    if min_date is not None:
+                        stat = os.stat(full_path)
+                        file_date = datetime.datetime.fromtimestamp(stat.st_mtime)
+                        if file_date < min_date:
+                            continue
+                    results.append((os.path.relpath(full_path, path), full_path))
+        if sort_func is not None:
+            results.sort(key=sort_func)
+        return [result[0] for result in results]
+
+
+"""
+lister = FileLister()
+
+# List all files in the current directory
+files = lister.list_files(".")
+print(files)
+
+# List all PNG files in the current directory and its subdirectories
+files = lister.list_files(".", patterns=["*.png"], recursive=True)
+print(files)
+
+# List all files modified in the last 7 days in the current directory and its subdirectories
+files = lister.list_files(".", age=7, recursive=True, sorted=True)
+print(files)
+
+# List all files created on a specific date in the current directory and its subdirectories
+files = lister.list_files_by_date(".", "20211107", by_created=True)
+print(files)
+
+"""
