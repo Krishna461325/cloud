@@ -27,3 +27,31 @@ class DateFormatConverter:
         except ValueError:
             pass
         return possible_formats
+
+
+
+from datetime import datetime
+
+class DateFormatter:
+    @staticmethod
+    def generate_date_formats(date_str, date_fmt='%Y%m%d'):
+        # parse the input date string using the specified format
+        dt = datetime.strptime(date_str, date_fmt)
+
+        # list of year, month, date format strings, and separators
+        formats = ['%Y', '%y', '%m', '%B', '%b', '%d', '%j', '%A', '%a']
+        separators = ['-', '/', '\\', ' ']
+
+        # iterate over all combinations of format strings and separators and generate the corresponding date/time string
+        results = []
+        for year_fmt in formats:
+            for month_fmt in formats:
+                for day_fmt in formats:
+                    for sep in separators:
+                        format_str = f"{year_fmt}{sep}{month_fmt}{sep}{day_fmt}"
+                        try:
+                            results.append(dt.strftime(format_str))
+                        except ValueError:
+                            pass
+
+        return results
