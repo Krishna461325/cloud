@@ -1,0 +1,29 @@
+from datetime import datetime
+from dateutil.parser import parse
+
+class DateFormatConverter:
+    def __init__(self, date_str, input_fmt):
+        self.date_str = date_str
+        self.input_fmt = input_fmt
+    
+    def convert(self, expected_fmt):
+        dt = datetime.strptime(self.date_str, self.input_fmt)
+        return dt.strftime(expected_fmt)
+    
+    def get_all_formats(self):
+        possible_formats = []
+        try:
+            dt = parse(self.date_str)
+            possible_formats.append(dt.strftime("%Y-%m-%d"))
+            possible_formats.append(dt.strftime("%m-%d-%Y"))
+            possible_formats.append(dt.strftime("%d-%m-%Y"))
+            possible_formats.append(dt.strftime("%Y/%m/%d"))
+            possible_formats.append(dt.strftime("%m/%d/%Y"))
+            possible_formats.append(dt.strftime("%d/%m/%Y"))
+            possible_formats.append(dt.strftime("%b %d, %Y"))
+            possible_formats.append(dt.strftime("%B %d, %Y"))
+            possible_formats.append(dt.strftime("%d %b %Y"))
+            possible_formats.append(dt.strftime("%d %B %Y"))
+        except ValueError:
+            pass
+        return possible_formats
