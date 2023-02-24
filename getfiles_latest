@@ -102,3 +102,36 @@ def _list_files_helper(self, path, patterns, target_date, recursive=False, depth
     if sort_func is not None:
         results.sort(key=sort_func)
     return results
+
+
+
+
+
+import os
+
+def sort_files_by_attribute(file_list, sort_attribute):
+    # check if sort attribute is valid
+    if sort_attribute not in ['create_time', 'modified_time', 'last_saved_time', 'last_accessed_time']:
+        raise ValueError("Invalid sort attribute")
+
+    # create a list of file dictionaries with path and attribute value
+    file_info_list = []
+    for file_path in file_list:
+        if sort_attribute == 'create_time':
+            attribute_value = os.path.getctime(file_path)
+        elif sort_attribute == 'modified_time':
+            attribute_value = os.path.getmtime(file_path)
+        elif sort_attribute == 'last_saved_time':
+            attribute_value = os.path.getmtime(file_path)
+        elif sort_attribute == 'last_accessed_time':
+            attribute_value = os.path.getatime(file_path)
+
+        file_info_list.append({'path': file_path, 'attribute_value': attribute_value})
+
+    # sort the file list based on attribute value
+    sorted_files = sorted(file_info_list, key=lambda x: x['attribute_value'])
+
+    # create a sorted list of file paths
+    sorted_file_list = [file_info['path'] for file_info in sorted_files]
+
+    return sorted_file_list
