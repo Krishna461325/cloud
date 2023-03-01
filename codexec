@@ -40,3 +40,18 @@ output = executor.send_command('Get-Process | Select-Object ProcessName, Id, Wor
 print(output)
 
 executor.close_session()
+
+
+
+def send_command(self, command):
+    self.process.write(command + '\n')
+    self.process.flush()
+    output = ''
+    while True:
+        chunk = self.session.stdout.read(1024).decode('utf-8')
+        if not chunk:
+            break
+        output += chunk
+    output_lines = output.split('\n')
+    return output_lines[-2]
+
