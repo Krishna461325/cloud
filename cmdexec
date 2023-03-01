@@ -1,65 +1,53 @@
 import subprocess
 
-class CommandSession:
-    def __init__(self):
-        self.session = None
+class ShellSession:
+    def __init__(self, shell_name):
+        self.shell_name = shell_name
+        self.process = None
         
-    def start_session(self, shell_name=None):
+    def open_session(self):
         try:
-            if shell_name is None:
-                shell_name = 'cmd' if subprocess.mswindows else '/bin/bash'
-            if shell_name in ['cmd', 'powershell']:
-                self.session = subprocess.Popen([shell_name], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            else:
-                self.session = subprocess.Popen([shell_name], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.process = subprocess.Popen(self.shell_name, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            return True
         except Exception as e:
-            raise Exception('Failed to start session. Error: {}'.format(str(e)))
-    
+            print("Error opening session: ", e)
+            return False
+        
+    def close_session(self):
+        try:
+            self.process.stdin.close()
+            self.process.stdout.close()
+            self.process.stderr.close()
+            self.process.terminate()
+            self.process.wait()
+            self.process = None
+            return True
+        except Exception as e:
+            print("Error closing session: ", e)
+            return False
+        
     def execute_command(self, command):
         try:
-            self.session.stdin.write(command.encode())
-            self.session.stdin.flush()
-            output = self.session.stdout.read().decode()
-            error = self.session.stderr.read().decode()
-            return output, error
+            if not self.process:
+                self.open_session()
+            self.process.stdin.write(command.encode('utf-8') + b"\n")
+            self.process.stdin.flush()
+            output = self.process.stdout.readline().decode('utf-8').strip()
+            while output != '':
+                print(output)
+                output = self.process.stdout.readline().decode('utf-8').strip()
+            error = self.process.stderr.readline().decode('utf-8').strip()
+            while error != '':
+                print(error)
+                error = self.process.stderr.readline().decode('utf-8').strip()
+            return True
         except Exception as e:
-            raise Exception('Failed to execute command. Error: {}'.format(str(e)))
-    
-    def execute_script(self, script_path, *args):
-        try:
-            command = [script_path] + list(args)
-            return self.execute_command(' '.join(command))
-        except Exception as e:
-            raise Exception('Failed to execute script. Error: {}'.format(str(e)))
+            print("Error executing command: ", e)
+            return False
 
 
-
-# Example 1: Open a cmd session and execute a simple command
-session = CommandSession()
-session.start_session('cmd')
-output, error = session.execute_command('dir')
-print(output)
-
-# Example 2: Open a bash session and execute a simple command
-session = CommandSession()
-session.start_session('/bin/bash')
-output, error = session.execute_command('ls')
-print(output)
-
-# Example 3: Open a PowerShell session and execute a command
-session = CommandSession()
-session.start_session('powershell')
-output, error = session.execute_command('Get-ChildItem C:\\')
-print(output)
-
-# Example 4: Execute a script with arguments in a cmd session
-session = CommandSession()
-session.start_session('cmd')
-output, error = session.execute_script('my_script.cmd', 'arg1', 'arg2')
-print(output)
-
-# Example 5: Execute a script with arguments in a bash session
-session = CommandSession()
-session.start_session('/bin/bash')
-output, error = session.execute_script('./my_script.sh', 'arg1', 'arg2')
-print(output)
+session = ShellSession('cmd.exe')
+session.open_session()
+session.execute_command('dir')
+session.execute_command('ping google.com')
+session.close_session()
