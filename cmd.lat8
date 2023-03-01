@@ -1,0 +1,59 @@
+import subprocess
+
+class CommandExecutor:
+    def __init__(self):
+        pass
+
+    def execute(self, command, shell_type):
+        try:
+            if shell_type == 'cmd':
+                command_prefix = ''
+                command_suffix = ''
+            elif shell_type == 'powershell':
+                command_prefix = ''
+                command_suffix = ''
+                command = f'powershell.exe -Command "{command}"'
+            elif shell_type == 'bash':
+                command_prefix = ''
+                command_suffix = ''
+            elif shell_type == 'ksh':
+                command_prefix = ''
+                command_suffix = ''
+            else:
+                raise ValueError(f"Unsupported shell type: {shell_type}")
+
+            # Execute the command and capture the output
+            process = subprocess.Popen(f"{command_prefix} {command} {command_suffix}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, error = process.communicate()
+
+            # Check if the command was successful
+            if process.returncode == 0:
+                return output.decode().strip()
+            else:
+                raise Exception(f"Command '{command}' failed with error: {error.decode().strip()}")
+        except Exception as e:
+            raise Exception(f"Command '{command}' failed with error: {str(e)}")
+
+    def execute_command(self, shell_type, command):
+        return self.execute(command, shell_type)
+
+
+
+# Initialize a CommandExecutor
+executor = CommandExecutor()
+
+# Execute a command in cmd.exe
+output = executor.execute_command("cmd", "dir")
+print(output)
+
+# Execute a command in PowerShell
+output = executor.execute_command("powershell", "Get-Process | Select-Object Name, Id, Path")
+print(output)
+
+# Execute a command in Bash
+output = executor.execute_command("bash", "ls -l")
+print(output)
+
+# Execute a command in Korn shell (ksh)
+output = executor.execute_command("ksh", "echo 'Hello World!'")
+print(output)
