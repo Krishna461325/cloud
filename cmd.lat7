@@ -1,10 +1,13 @@
 import subprocess
 
 class CommandExecutor:
-    def execute(self, command):
+    def execute(self, command, shell=False):
         try:
             # Execute the command and capture the output
-            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if shell:
+                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            else:
+                process = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output, error = process.communicate()
 
             # Check if the command was successful
@@ -15,7 +18,63 @@ class CommandExecutor:
         except Exception as e:
             raise Exception(f"Command '{command}' failed with error: {str(e)}")
 
+    def execute_cmd(self, command):
+        return self.execute(command, shell=True)
+
+    def execute_powershell(self, command):
+        powershell_command = f"& {{{command}}}"
+        return self.execute(["powershell.exe", "-Command", powershell_command])
+
+    def execute_script(self, script_path, *args):
+        try:
+            # Construct the PowerShell command to execute the script
+            script_args = " ".join(args)
+            command = f"& '{script_path}' {script_args}"
+            
+            # Execute the command and capture the output
+            process = subprocess.Popen(["powershell.exe", "-Command", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, error = process.communicate()
+
+            # Check if the command was successful
+            if process.returncode == 0:
+                return output.decode().strip()
+            else:
+                raise Exception(f"Script '{script_path}' failed with error: {error.decode().strip()}")
+        except Exception as e:
+            raise Exception(f"Script '{script_path}' failed with error: {str(e)}}")
+
+    def execute_shell(self, command):
+        return self.execute(command, shell=True)
+
+
+
+
 
 executor = CommandExecutor()
-output = executor.execute("ls -l")
+
+# Execute a command in cmd.exe
+output = executor.execute_cmd("dir")
+print(output)
+
+# Execute a command in PowerShell
+output = executor.execute_powershell("Get-Process | Select-Object Name, Id, Path")
+print(output)
+
+# Execute a command in shell
+output = executor.execute_shell("ls -l")
+print(output)
+
+
+executor = CommandExecutor()
+
+# Run a .bat file with arguments
+output = executor.execute_cmd("example.bat arg1 arg2")
+print(output)
+
+# Run a .ps1 file with arguments
+output = executor.execute_powershell(".\\example.ps1 -arg1 value1 -arg2 value2")
+print(output)
+
+# Run a .sh file with arguments
+output = executor.execute_shell("./example.sh arg1 arg2")
 print(output)
