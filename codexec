@@ -1,0 +1,54 @@
+import subprocess
+
+class CommandExecutor:
+    def __init__(self):
+        self.session = None
+        self.process = None
+    
+    def open_session(self, command):
+        self.session = subprocess.Popen(command,
+                                        stdin=subprocess.PIPE,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE,
+                                        shell=True)
+        self.process = self.session.stdin
+    
+    def send_command(self, command):
+        self.process.write(command.encode())
+        self.process.flush()
+        output = self.session.stdout.read().decode()
+        return output
+    
+    def run_script(self, script_path):
+        with open(script_path, 'r') as script_file:
+            script_content = script_file.read()
+        return self.send_command(script_content)
+    
+    def close_session(self):
+        if self.session is not None:
+            self.session.stdin.close()
+            self.session.stdout.close()
+            self.session.stderr.close()
+            self.session.terminate()
+            self.session = None
+            self.process = None
+            
+            
+     executor = CommandExecutor()
+
+# open a session and send commands
+executor.open_session("powershell.exe")
+output1 = executor.send_command("Get-ChildItem -Path 'C:\\'\n")
+output2 = executor.send_command("Write-Host 'Hello, world!'\n")
+executor.close_session()
+
+# run a script separately
+executor.open_session("powershell.exe")
+output3 = executor.run_script("C:\\Scripts\\MyScript.ps1")
+executor.close_session()
+
+# print the output
+print(output1)
+print(output2)
+print(output3)
+
