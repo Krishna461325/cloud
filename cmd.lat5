@@ -1,0 +1,43 @@
+import os
+
+class CommandExecutor:
+    @staticmethod
+    def execute_command(command):
+        try:
+            output = os.popen(command).read()
+            print(output)
+        except Exception as e:
+            print(f"Error executing command '{command}': {e}")
+
+    @staticmethod
+    def execute_script(script_path, args):
+        try:
+            if os.name == "nt":
+                command = f"{script_path} {' '.join(args)}"
+                output = os.popen(command).read()
+            else:
+                command = [script_path] + args
+                output = os.popen(" ".join(command)).read()
+            print(output)
+        except Exception as e:
+            print(f"Error executing script '{script_path}': {e}")
+
+executor = CommandExecutor()
+
+# Execute Windows command: Dir *.log
+executor.execute_command("Dir *.log")
+
+# Execute Windows batch script: C:\temp\test.bat ag1 arg2 arg3
+executor.execute_script(r"C:\temp\test.bat", ["arg1", "arg2", "arg3"])
+
+# Execute PowerShell command: get-childitem
+executor.execute_command("powershell.exe get-childitem")
+
+# Execute PowerShell script: C:\temp\test.ps1 arg2 arg3 arg4
+executor.execute_script(r"C:\temp\test.ps1", ["arg2", "arg3", "arg4"])
+
+# Execute Unix command: ls -ltr
+executor.execute_command("ls -ltr")
+
+# Execute Unix script: /tmp/test.sh arg1 arg2 arg3
+executor.execute_script("/tmp/test.sh", ["arg1", "arg2", "arg3"])
