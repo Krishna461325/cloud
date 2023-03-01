@@ -1,0 +1,92 @@
+import subprocess
+import threading
+import queue
+
+class ExecuteCommand:
+    def __init__(self, shell_name):
+        self.shell_name = shell_name
+        self.process = None
+        self.input_queue = queue.Queue()
+        self.output_queue = queue.Queue()
+        self.error_queue = queue.Queue()
+        self.input_thread = None
+        self.output_thread = None
+        self.error_thread = None
+
+    def open_session(self):
+        try:
+            self.process = subprocess.Popen(
+                [self.shell_name],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=0,
+            )
+            self.input_thread = threading.Thread(target=self._read_input)
+            self.output_thread = threading.Thread(target=self._read_output)
+            self.error_thread = threading.Thread(target=self._read_error)
+            self.input_thread.start()
+            self.output_thread.start()
+            self.error_thread.start()
+            return True
+        except Exception as e:
+            print("Error opening session: ", e)
+            return False
+
+    def close_session(self):
+        try:
+            if self.process.poll() is None:
+                self.process.terminate()
+                self.process.wait()
+            self.input_thread.join()
+            self.output_thread.join()
+            self.error_thread.join()
+            return True
+        except Exception as e:
+            print("Error closing session: ", e)
+            return False
+
+    def execute_command(self, command):
+        try:
+            if not self.process:
+                self.open_session()
+            self.input_queue.put(command)
+            return True
+        except Exception as e:
+            print("Error executing command: ", e)
+            return False
+
+    def _read_input(self):
+        try:
+            while True:
+                input_line = self.input_queue.get()
+                self.process.stdin.write(input_line + "\n")
+                self.process.stdin.flush()
+                if input_line.lower() == "exit":
+                    break
+            self.process.stdin.close()
+        except Exception as e:
+            print("Error reading input: ", e)
+
+    def _read_output(self):
+        try:
+            for output_line in iter(self.process.stdout.readline, ""):
+                self.output_queue.put(output_line)
+            self.process.stdout.close()
+        except Exception as e:
+            print("Error reading output: ", e)
+
+    def _read_error(self):
+        try:
+            for error_line in iter(self.process.stderr.readline, ""):
+                self.error_queue.put(error_line)
+            self.process.stderr.close()
+        except Exception as e:
+            print("Error reading error: ", e)
+
+
+session = ExecuteCommand('cmd.exe')
+session.open_session()
+session.execute_command('dir')
+for output_line in iter(session.output_queue
