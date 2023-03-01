@@ -1,0 +1,42 @@
+import subprocess
+
+class CommandExecutor:
+    def __init__(self, shell):
+        self.shell = shell
+    
+    def execute_command(self, command):
+        try:
+            result = subprocess.run(command, shell=self.shell, capture_output=True, text=True, check=True)
+            return result.stdout
+        except subprocess.CalledProcessError as error:
+            print(f'Command failed with return code {error.returncode}.')
+            print(f'Stderr output: {error.stderr}')
+            return None
+    
+    def execute_script(self, script_path, *args):
+        full_command = [script_path] + list(args)
+        return self.execute_command(full_command)
+
+
+
+cmd_executor = CommandExecutor('cmd')
+ps_executor = CommandExecutor('powershell')
+bash_executor = CommandExecutor('bash')
+
+result = cmd_executor.execute_command('dir /s')
+print(result)
+
+result = ps_executor.execute_command('Get-ChildItem -Recurse')
+print(result)
+
+result = bash_executor.execute_command('ls -R')
+print(result)
+
+result = cmd_executor.execute_script('test.bat', 'arg1', 'arg2')
+print(result)
+
+result = ps_executor.execute_script('test.ps1', 'arg1', 'arg2')
+print(result)
+
+result = bash_executor.execute_script('test.sh', 'arg1', 'arg2')
+print(result)
