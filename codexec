@@ -10,13 +10,14 @@ class CommandExecutor:
                                         stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE,
-                                        shell=True)
+                                        shell=True,
+                                        universal_newlines=True)
         self.process = self.session.stdin
     
     def send_command(self, command):
-        self.process.write(command.encode())
+        self.process.write(command + '\n')
         self.process.flush()
-        output = self.session.stdout.read().decode()
+        output = self.session.stdout.readline().rstrip()
         return output
     
     def run_script(self, script_path):
@@ -32,23 +33,10 @@ class CommandExecutor:
             self.session.terminate()
             self.session = None
             self.process = None
-            
-            
-     executor = CommandExecutor()
+executor = CommandExecutor()
+executor.open_session('powershell.exe')
 
-# open a session and send commands
-executor.open_session("powershell.exe")
-output1 = executor.send_command("Get-ChildItem -Path 'C:\\'\n")
-output2 = executor.send_command("Write-Host 'Hello, world!'\n")
+output = executor.send_command('Get-Process | Select-Object ProcessName, Id, WorkingSet | Sort-Object WorkingSet -Descending')
+print(output)
+
 executor.close_session()
-
-# run a script separately
-executor.open_session("powershell.exe")
-output3 = executor.run_script("C:\\Scripts\\MyScript.ps1")
-executor.close_session()
-
-# print the output
-print(output1)
-print(output2)
-print(output3)
-
