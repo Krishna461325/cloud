@@ -1,0 +1,65 @@
+import subprocess
+
+class CommandSession:
+    def __init__(self):
+        self.session = None
+        
+    def start_session(self, shell_name=None):
+        try:
+            if shell_name is None:
+                shell_name = 'cmd' if subprocess.mswindows else '/bin/bash'
+            if shell_name in ['cmd', 'powershell']:
+                self.session = subprocess.Popen([shell_name], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            else:
+                self.session = subprocess.Popen([shell_name], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except Exception as e:
+            raise Exception('Failed to start session. Error: {}'.format(str(e)))
+    
+    def execute_command(self, command):
+        try:
+            self.session.stdin.write(command.encode())
+            self.session.stdin.flush()
+            output = self.session.stdout.read().decode()
+            error = self.session.stderr.read().decode()
+            return output, error
+        except Exception as e:
+            raise Exception('Failed to execute command. Error: {}'.format(str(e)))
+    
+    def execute_script(self, script_path, *args):
+        try:
+            command = [script_path] + list(args)
+            return self.execute_command(' '.join(command))
+        except Exception as e:
+            raise Exception('Failed to execute script. Error: {}'.format(str(e)))
+
+
+
+# Example 1: Open a cmd session and execute a simple command
+session = CommandSession()
+session.start_session('cmd')
+output, error = session.execute_command('dir')
+print(output)
+
+# Example 2: Open a bash session and execute a simple command
+session = CommandSession()
+session.start_session('/bin/bash')
+output, error = session.execute_command('ls')
+print(output)
+
+# Example 3: Open a PowerShell session and execute a command
+session = CommandSession()
+session.start_session('powershell')
+output, error = session.execute_command('Get-ChildItem C:\\')
+print(output)
+
+# Example 4: Execute a script with arguments in a cmd session
+session = CommandSession()
+session.start_session('cmd')
+output, error = session.execute_script('my_script.cmd', 'arg1', 'arg2')
+print(output)
+
+# Example 5: Execute a script with arguments in a bash session
+session = CommandSession()
+session.start_session('/bin/bash')
+output, error = session.execute_script('./my_script.sh', 'arg1', 'arg2')
+print(output)
