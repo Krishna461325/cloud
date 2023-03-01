@@ -1,0 +1,21 @@
+import subprocess
+
+class CommandExecutor:
+    @staticmethod
+    def execute_command(command):
+        try:
+            output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+            return output.decode().strip()
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing command '{command}': {e.output.decode().strip()}")
+            return ""
+
+    @staticmethod
+    def execute_script(script_path, args):
+        try:
+            command = [script_path] + args
+            output = subprocess.check_output(command, stderr=subprocess.STDOUT)
+            return output.decode().strip()
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing script '{script_path}': {e.output.decode().strip()}")
+            return ""
