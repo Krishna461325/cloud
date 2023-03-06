@@ -62,3 +62,56 @@ if __name__ == '__main__':
     # Call the main function with the specified source file
     main(args.source)
 
+
+
+import os
+import zipfile
+
+def extract_zip(archive_path, extract_dir=None, file_filter=None):
+    """
+    Extract files from a zip archive.
+
+    Args:
+        archive_path (str): Path to the zip archive.
+        extract_dir (str, optional): Directory to extract files to. Defaults to None (current working directory).
+        file_filter (list of str, optional): List of file extensions to extract. Defaults to None (extract all files).
+
+    Returns:
+        None.
+    """
+
+    # check if archive exists
+    if not os.path.exists(archive_path):
+        raise FileNotFoundError(f'Archive {archive_path} does not exist')
+
+    # check if extract_dir exists
+    if extract_dir is not None and not os.path.exists(extract_dir):
+        raise FileNotFoundError(f'Extract directory {extract_dir} does not exist')
+
+    # open the archive and extract files
+    with zipfile.ZipFile(archive_path, 'r') as archive:
+        # get a list of all files in the archive that match the filter
+        if file_filter is None:
+            files_to_extract = archive.namelist()
+        else:
+            files_to_extract = [f for f in archive.namelist() if os.path.splitext(f)[1] in file_filter]
+
+        # extract each file to the specified directory
+        for file_path in files_to_extract:
+            # get the full path to the file in the archive
+            full_path = os.path.join(archive_path, file_path)
+
+            # get the destination path for the extracted file
+            if extract_dir is not None:
+                dest_path = os.path.join(extract_dir, file_path)
+            else:
+                dest_path = file_path
+
+            # create the destination directory if it does not exist
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+            # extract the file
+            with archive.open(file_path) as src_file, open(dest_path, 'wb') as dest_file:
+                dest_file.write(src_file.read())
+
+    print(f'Files extracted successfully to {extract_dir or "."}')
